@@ -1,18 +1,62 @@
-# Midnight Signal
+<div align="center">
 
-A cinematic, local terminal AI built on Ollama — true word-by-word
-streaming (the same feel as `ollama run`), a live truecolor gradient UI
-with switchable themes, synthesized sound effects, persistent sessions, a
-project **radar** scanner, live model and sampling controls, and a real
-tool-calling **agent mode** that can read, write, edit files, list
-directories, run shell commands, and inspect git — with confirmation
-prompts and an optional "yolo" mode.
+# 🌒 Midnight Signal
+
+**A cinematic, local terminal AI — built on Ollama.**
+
+True word-by-word streaming, a live truecolor gradient UI with switchable
+themes, synthesized sound effects, persistent sessions, a project
+**radar** scanner, live model/sampling controls, and a real tool-calling
+**agent mode** that reads, writes, edits files, runs shell commands, and
+inspects git — with confirmation prompts and an optional "yolo" mode.
+
+[![Base model](https://img.shields.io/badge/base%20model-qwen2.5--coder--abliterate%3A7b-orange)](#)
+[![Runs on](https://img.shields.io/badge/runs%20on-Ollama-black)](#)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-blue)](#)
+[![License](https://img.shields.io/badge/uncensored-by%20design-red)](#)
+
+</div>
+
+---
 
 Uncensored by design: it's built on an abliterated base model and its
 system prompts carry no added refusal language or safety lecturing on top
 of it — you get the model's own behavior, not a wrapper's opinion of it.
 
-Base model: `huihui_ai/qwen2.5-coder-abliterate:7b`
+**Base model:** `huihui_ai/qwen2.5-coder-abliterate:7b`
+
+## Screenshots
+
+<p align="center">
+  <img src="assets/screenshot-banner.png" alt="Midnight Signal boot banner and default mode chat" width="850">
+</p>
+
+<p align="center">
+  <em>Boot banner, live gradient UI, and per-reply usage line — v2.2, mode: default</em>
+</p>
+
+<p align="center">
+  <img src="assets/screenshot-help.png" alt="Midnight Signal /help menu showing commands, modes, and agent tools" width="850">
+</p>
+
+<p align="center">
+  <em><code>/help</code> — full command list, modes, and agent tools</em>
+</p>
+
+---
+
+## Contents
+
+1. [Quick install](#1-quick-install)
+2. [Manual install](#2-manual-install)
+3. [Run it](#3-run-it)
+4. [Commands](#4-commands)
+5. [Modes](#5-modes)
+6. [Agent mode — how it works](#6-agent-mode--how-it-works)
+7. [Adding new modes](#7-adding-new-modes)
+8. [Usage bars, sparklines, sound, and themes](#8-usage-bars-sparklines-sound-and-themes)
+9. [File overview](#9-file-overview)
+10. [Troubleshooting](#10-troubleshooting)
 
 ---
 
