@@ -19,9 +19,11 @@ inspects git — with confirmation prompts and an optional "yolo" mode.
 
 ---
 
-Uncensored by design: it's built on an abliterated base model and its
-system prompts carry no added refusal language or safety lecturing on top
-of it — you get the model's own behavior, not a wrapper's opinion of it.
+> **Unrestricted by design.** This is the core idea behind Midnight Signal:
+> it runs on an **abliterated** base model, and the system prompts add no
+> refusal language, no safety lecturing, and no filtering on top of it.
+> Ask it anything — you get the model's own answer, not a wrapper's opinion
+> of what you're allowed to ask. No leash, no filter, fully local.
 
 **Base model:** `huihui_ai/qwen2.5-coder-abliterate:7b`
 
