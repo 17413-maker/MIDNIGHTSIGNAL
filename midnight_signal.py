@@ -45,7 +45,7 @@ import security
 import sounds
 from agent import run_agent, AgentEvent
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 MODEL_NAME = "midnight-signal"
 BASE_MODEL = "huihui_ai/qwen2.5-coder-abliterate:7b"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -102,6 +102,8 @@ BASE_COMMANDS = [
     ("/sound [on|off]", "sound effects · /sound vol 0-100 · /sound test"),
     ("/theme [name]", "colour theme · /theme auto = one per mode"),
     ("/statusbar", "toggle the status line above the prompt"),
+    ("/search <term>", "search this conversation for a word or phrase"),
+    ("/diff [path]", "show git diff for the working directory (read-only)"),
     ("/banner", "reprint the main banner"),
     ("/clear", "clear screen + reprint banner"),
     ("/status", "show current mode + session info"),
@@ -195,6 +197,7 @@ class MidnightSignal:
         self.resume = resume
         self.total_tokens = 0
         self.total_gen_seconds = 0.0
+        self.speed_history = []        # recent tok/s per turn, for /stats sparkline
         self.last_usage = {"prompt": 0, "gen": 0}
         self.settings = session.load_settings()
         sounds.engine.configure(enabled=self.settings["sound"], volume=self.settings["volume"] / 100)
@@ -210,6 +213,7 @@ class MidnightSignal:
             "/sessions": self.cmd_sessions, "/export": self.cmd_export, "/copy": self.cmd_copy,
             "/cd": self.cmd_cd, "/ls": self.cmd_ls, "/pwd": self.cmd_pwd, "/yolo": self.cmd_yolo,
             "/sound": self.cmd_sound, "/theme": self.cmd_theme, "/statusbar": self.cmd_statusbar,
+            "/search": self.cmd_search, "/diff": self.cmd_diff,
         }
 
     # ---------------------------------------------------------- lifecycle
@@ -690,31 +694,108 @@ class MidnightSignal:
         if not used:
             used = sum(len(m.get("content", "") or "") for m in self.history) // 4
             estimated = True
-        pct = used / limit
-        print()
-        print(f"  {ui.context_bar(pct, 32)}  {ui.white(f'{pct * 100:.0f}%')}")
-        note = " (estimated)" if estimated else ""
-        print(ui.gray(f"  ~{used:,} / {limit:,} tokens{note}"))
-        if pct >= 0.8:
-            print(ui.warn("  running hot") + ui.gray(" — /compact to summarize, or /set num_ctx higher"))
-
+        pct = min(used / limit, 1.0)
 
         # Ollama reports one prompt-token total, so split it by character share.
         sys_chars = len(self.history[0].get("content", "") or "") if self.history else 0
         convo_chars = sum(len(m.get("content", "") or "") for m in self.history[1:])
         sys_tokens = round(used * sys_chars / ((sys_chars + convo_chars) or 1))
-        print(ui.gray(
-            f"  system ~{sys_tokens:,} · conversation ~{used - sys_tokens:,} · free {max(limit - used, 0):,}"
+        convo_tokens = max(used - sys_tokens, 0)
+        free = max(limit - used, 0)
+
+        print()
+        title = ui.solid(f"{pct * 100:.0f}%", ui.RED if pct >= 0.85 else ui.gradient_color(0.35) if pct >= 0.6 else ui.SOFT_WHITE, bold=True)
+        print(f"  {ui.gradient_text('CONTEXT WINDOW', bold=True)}   {title}")
+        print("  " + ui.segmented_bar(
+            [("system", sys_tokens / limit, ui.GRAY), ("conversation", convo_tokens / limit, None)], width=48,
         ))
+        print(
+            f"  {ui.solid('■', ui.GRAY)} {ui.gray('system')} {ui.white(f'{sys_tokens:,}')}"
+            f"    {ui.solid('■', ui.gradient_color(0.4))} {ui.gray('conversation')} {ui.white(f'{convo_tokens:,}')}"
+            f"    {ui.solid('■', ui.DARK_GRAY)} {ui.gray('free')} {ui.white(f'{free:,}')}"
+        )
+        note = " (estimated — no reply yet this session)" if estimated else ""
+        print(ui.gray(f"  {used:,} / {limit:,} tokens{note}"))
+        if pct >= 0.8:
+            print(ui.warn("  running hot") + ui.gray(" — /compact to summarize, or /set num_ctx higher"))
         print()
 
     def cmd_stats(self, arg):
         avg = self.total_tokens / self.total_gen_seconds if self.total_gen_seconds else 0.0
+        hist = self.speed_history
         print(ui.dim_line("  ┌─ session stats ────────────────────"))
         print(f"  {ui.gray('turns')}       {ui.white(str(self.turn_count))}")
         print(f"  {ui.gray('generated')}   {ui.white(f'{self.total_tokens:,} tokens')}")
         print(f"  {ui.gray('avg speed')}   {ui.white(f'{avg:.1f} tok/s')}  {ui.signal_meter(avg)}")
+        if hist:
+            print(f"  {ui.gray('speed trend')} {ui.sparkline(hist)}  {ui.gray(f'{min(hist):.0f}–{max(hist):.0f} tok/s, last {len(hist)}')}")
         print(ui.dim_line("  └────────────────────────────────────"))
+
+    def cmd_search(self, arg):
+        term = arg.strip()
+        if not term:
+            print(ui.error("  usage: /search <word or phrase>"))
+            return
+        needle = term.lower()
+        hits = []
+        for idx, m in enumerate(self.history):
+            if m.get("role") == "system":
+                continue
+            content = m.get("content", "") or ""
+            pos = content.lower().find(needle)
+            if pos != -1:
+                hits.append((idx, m["role"], content, pos))
+
+        if not hits:
+            print(ui.gray(f"  no matches for '{term}' in this conversation."))
+            return
+
+        print()
+        print(ui.gradient_text(f"{len(hits)} MATCH" + ("ES" if len(hits) != 1 else ""), bold=True) + ui.gray(f"  for '{term}'"))
+        for idx, role, content, pos in hits[-20:]:
+            radius = 46
+            start = max(pos - radius, 0)
+            end = min(pos + len(term) + radius, len(content))
+            snippet = content[start:end].replace("\n", " ")
+            match_start = pos - start
+            before = snippet[:match_start]
+            match = snippet[match_start:match_start + len(term)]
+            after = snippet[match_start + len(term):]
+            ellipsis_l = "…" if start > 0 else ""
+            ellipsis_r = "…" if end < len(content) else ""
+            who = ui.solid(role[:4], ui.gradient_color(0.3), bold=True)
+            print(f"  {ui.gray(f'#{idx:<3}')} {who}  {ui.gray(ellipsis_l + before)}"
+                  f"{ui.solid(match, ui.gradient_color(0.15), bold=True)}"
+                  f"{ui.gray(after + ellipsis_r)}")
+        if len(hits) > 20:
+            print(ui.gray(f"  …and {len(hits) - 20} more match(es) not shown."))
+        print()
+
+    def cmd_diff(self, arg):
+        try:
+            raw = tool_impl.git_diff(self.cwd, arg.strip())
+        except tool_impl.ToolError as e:
+            print(ui.error(f"  {e}"))
+            return
+
+        # git_diff wraps run_command's "exit code: N\nstdout:\n...\nstderr:\n..." shape.
+        code_line, _, rest = raw.partition("\n")
+        ok = code_line.strip() == "exit code: 0"
+        stdout = rest.split("stdout:\n", 1)[1].split("\nstderr:")[0] if "stdout:\n" in rest else ""
+        stderr = rest.split("stderr:\n", 1)[1] if "stderr:\n" in rest else ""
+
+        if not ok:
+            first_err = next((l for l in stderr.splitlines() if l.strip()), "git diff failed")
+            print(ui.gray(f"  {first_err}"))
+            return
+        if not stdout.strip():
+            print(ui.gray("  no changes."))
+            return
+
+        print()
+        for line in stdout.splitlines():
+            print("  " + ui.colorize_diff_line(line))
+        print()
 
     def cmd_compact(self, arg):
         convo = [m for m in self.history[1:] if m.get("content")]
@@ -939,6 +1020,9 @@ class MidnightSignal:
             self.last_usage = {"prompt": prompt_tokens, "gen": gen}
             self.total_tokens += gen
             self.total_gen_seconds += dur
+            if tps:
+                self.speed_history.append(tps)
+                del self.speed_history[:-40]   # keep it to recent turns
             pct = (prompt_tokens + gen) / self.options["num_ctx"]
             print()
             print(ui.render_footer(gen=gen, prompt=prompt_tokens, tps=tps, ttft=first_token, ctx_pct=pct))

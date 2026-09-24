@@ -137,6 +137,8 @@ first token). The `ctx` figure turns amber past 60% and red past 85%.
 | `/sound [on\|off]` | Toggle sound effects · `/sound vol 0-100` · `/sound test`  |
 | `/theme [name]`   | Colour theme · `/theme auto` gives each mode its own        |
 | `/statusbar`      | Toggle the status line (mode · dir · git branch · ctx) above the prompt |
+| `/search <term>`  | Search this conversation for a word or phrase              |
+| `/diff [path]`    | Show `git diff` for the working directory (read-only)      |
 | `/banner`         | Reprint the main banner                                    |
 | `/clear`          | Clear the screen and reprint the banner                    |
 | `/status`         | Mode, model, working directory, yolo state, uptime         |
@@ -212,7 +214,25 @@ Note: only give a mode agent-style tool access by naming it exactly
 loop) or by editing `midnight_signal.py`'s routing if you want a second
 tool-enabled mode.
 
-## 8. Sound and themes
+## 8. Usage bars, sparklines, sound, and themes
+
+Every token/context display uses a fuel-gauge-style bar with eighth-block
+precision (`▏▎▍▌▋▊▉█`) instead of a coarse one-block-per-cell bar, so it
+fills smoothly rather than in visible steps, with a bright leading edge
+and soft bracket caps (`╢…╟`). You'll see it in the footer under every
+reply and in `/context`, which also breaks total usage down into a
+stacked bar — system prompt, conversation, and free space, each their own
+shade:
+
+```
+CONTEXT WINDOW   52%
+╢█████████████████████████·······················╟
+■ system 1,720    ■ conversation 2,580    ■ free 3,892
+```
+
+`/stats` adds a **speed sparkline** — a one-line bar-height history of
+your last ~40 replies' tokens/sec, so you can see a session's speed trend
+at a glance instead of just the running average.
 
 Every sound is synthesized on the fly (sine/bell/square tones with an
 envelope) and cached as tiny WAVs under `~/.midnight_signal/sounds` — no

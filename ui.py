@@ -182,6 +182,69 @@ def gradient_bar(pct: float, width: int = 34) -> str:
     return "".join(chars) + RESET
 
 
+_EIGHTHS = " ▏▎▍▌▋▊▉█"    # 0..8 eighths of a cell, for sub-character fill precision
+_TRACK_DOT = "·"           # quiet unfilled track — a dotted line reads calmer than a dashed one
+
+
+def smooth_bar(pct: float, width: int = 16, stops=None, cap: bool = True) -> str:
+    """A fuel-gauge-style bar with eighth-block precision (up to width*8 fill
+    steps instead of `width`), a bright leading edge where the fill ends,
+    and soft bracket caps. Used for context/token usage everywhere in the UI."""
+    pct = min(max(pct, 0.0), 1.0)
+    units = round(pct * width * 8)
+    full_cells, rem = divmod(units, 8)
+    cells = []
+    for i in range(width):
+        t = i / max(width - 1, 1)
+        color = fg(gradient_color(t, stops or STOPS))
+        if i < full_cells:
+            cells.append(f"{color}█")
+        elif i == full_cells and rem:
+            cells.append(f"{color}{_EIGHTHS[rem]}")
+        else:
+            cells.append(f"{fg(DARK_GRAY)}{_TRACK_DOT}")
+    bar = "".join(cells) + RESET
+    if not cap:
+        return bar
+    edge = gradient_color(min(pct, 1.0), stops or STOPS)
+    left = solid("╢", DARK_GRAY)
+    right = solid("╟", edge, bold=True) if pct > 0 else solid("╟", DARK_GRAY)
+    return f"{left}{bar}{right}"
+
+
+def segmented_bar(segments, width: int = 40) -> str:
+    """A stacked usage bar: segments = [(label, fraction, rgb_or_None), ...]
+    fractions need not sum to 1 (the remainder renders as empty track).
+    None for a color falls back to the live gradient at that segment's
+    midpoint, so it stays on-theme automatically."""
+    cells, pos = [], 0.0
+    total = sum(f for _, f, _ in segments)
+    for _, frac, rgb in segments:
+        n = round(frac * width)
+        mid_t = min(max((pos + frac / 2) / max(total, 1e-9), 0.0), 1.0)
+        color = rgb or gradient_color(mid_t)
+        cells.append(fg(color) + "█" * n)
+        pos += frac
+    used_cells = sum(round(f * width) for _, f, _ in segments)
+    cells.append(fg(DARK_GRAY) + _TRACK_DOT * max(width - used_cells, 0))
+    return solid("╢", DARK_GRAY) + "".join(cells) + RESET + solid("╟", DARK_GRAY)
+
+
+def sparkline(values, stops=None) -> str:
+    """A one-line bar-height history, e.g. token speed across recent turns."""
+    if not values:
+        return dim_line("(no data yet)")
+    glyphs = "▁▂▃▄▅▆▇█"
+    lo, hi = min(values), max(values)
+    span = (hi - lo) or 1.0
+    out = []
+    for v in values:
+        t = (v - lo) / span
+        idx = min(int(t * (len(glyphs) - 1)), len(glyphs) - 1)
+        out.append(f"{fg(gradient_color(t, stops or STOPS))}{glyphs[idx]}")
+    return "".join(out) + RESET
+
+
 def boot_sequence(label: str = "establishing local uplink", width: int = 34, steps: int = 40):
     """Boot animation: scan line sweep + gradient bar fill."""
     sys.stdout.write(HIDE_CURSOR)
@@ -345,7 +408,7 @@ LOGO_LINES = [
 ]
 
 
-def render_main_banner(mode: str = "default", version: str = "2.1") -> str:
+def render_main_banner(mode: str = "default", version: str = "2.2") -> str:
     out = []
     for line in LOGO_LINES:
         out.append(gradient_line(line, bold=True))
@@ -918,7 +981,7 @@ def render_footer(gen=None, prompt=None, tps=None, ttft=None, ctx_pct=None) -> s
         bits.append(white(format_tokens(prompt)) + gray(" prompt"))
     if ctx_pct is not None:
         tone = RED if ctx_pct >= 0.85 else gradient_color(0.35) if ctx_pct >= 0.6 else SOFT_WHITE
-        bar = gradient_bar(min(max(ctx_pct, 0.0), 1.0), 10)
+        bar = smooth_bar(ctx_pct, 12)
         bits.append(gray("ctx ") + bar + " " + solid(f"{ctx_pct * 100:.0f}%", tone))
     if ttft is not None:
         bits.append(white(f"{ttft:.1f}s") + gray(" first token"))

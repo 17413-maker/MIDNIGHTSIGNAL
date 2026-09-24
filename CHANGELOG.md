@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.2.0
+
+- **Beautiful usage bars.** Every context/token bar now fills with
+  eighth-block precision (`▏▎▍▌▋▊▉█`, up to 8x the resolution of a
+  one-block-per-cell bar) instead of visible chunky steps, with a bright
+  leading edge and soft bracket caps. Used in the reply footer and
+  `/context`.
+- **`/context` redesign**: a stacked, multi-color bar showing system
+  prompt vs. conversation vs. free space as proportional segments, plus
+  the token counts for each.
+- **`/stats` speed sparkline**: a one-line bar-height history of your
+  last ~40 replies' tokens/sec, so you can see a session's speed trend,
+  not just the running average.
+- **`/search <term>`**: search the current conversation for a word or
+  phrase; shows each match with surrounding context and which turn it's
+  in.
+- **`/diff [path]`**: a top-level, read-only `git diff` you can run from
+  any mode, not just from inside the agent — with clean output for "no
+  changes" and "not a git repository" instead of a raw error dump.
+
 ## 2.1.0
 
 - **Word-by-word streaming.** The stream renderer used to buffer text until
